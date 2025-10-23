@@ -16,7 +16,6 @@ from keyboards.user_keyboards import (
     get_cart_keyboard,
     get_checkout_keyboard,
     get_payment_keyboard,
-    get_phone_request_keyboard,
     get_back_to_main_menu_keyboard
 )
 from utils.localization import get_text
@@ -146,11 +145,6 @@ async def start_checkout(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         get_text('send_phone', lang),
         reply_markup=None
-    )
-
-    await callback.message.answer(
-        get_text('phone_request', lang),
-        reply_markup=get_phone_request_keyboard(lang)
     )
 
     await state.set_state(OrderStates.waiting_for_phone)

@@ -101,10 +101,7 @@ TEXTS = {
         'uz': "📞 Telefon raqamingizni yuboring",
         'ru': "📞 Отправьте ваш номер телефона"
     },
-    'phone_request': {
-        'uz': "👇 Telefon raqamingizni yuboring:",
-        'ru': "👇 Отправьте ваш номер телефона:"
-    },
+
     'send_contact': {
         'uz': "📱 Telefon raqamni yuborish",
         'ru': "📱 Отправить номер телефона"
