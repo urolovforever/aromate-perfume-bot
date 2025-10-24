@@ -14,12 +14,11 @@ from database.db import (
 )
 from keyboards.user_keyboards import (
     get_cart_keyboard,
-    get_checkout_keyboard,
     get_payment_keyboard,
+    get_phone_request_keyboard,
     get_back_to_main_menu_keyboard
 )
 from utils.localization import get_text
-
 
 cart_router = Router()
 
@@ -49,22 +48,183 @@ async def show_cart(message: Message):
         )
         return
 
-    # Savat mazmunini tayyorlash
-    cart_text = get_text('cart_title', lang) + "\n\n"
-    total = 0
+    # Har bir mahsulot uchun inline keyboard yaratish
+    from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
     for idx, item in enumerate(cart_items, 1):
-        cart_text += f"{idx}. {item['name']}\n"
-        cart_text += f"   💰 {item['price']:,.0f} {get_text('sum', lang)} x {item['quantity']}\n"
-        cart_text += f"   = {item['price'] * item['quantity']:,.0f} {get_text('sum', lang)}\n\n"
-        total += item['price'] * item['quantity']
+        item_text = f"📦 {item['name']}\n\n"
+        item_text += f"💰 Narxi: {item['price']:,.0f} {get_text('sum', lang)}\n"
+        item_text += f"🔢 Miqdor: {item['quantity']} ta\n"
+        item_text += f"💵 Jami: {item['price'] * item['quantity']:,.0f} {get_text('sum', lang)}"
 
-    cart_text += f"\n💵 {get_text('total', lang)}: {total:,.0f} {get_text('sum', lang)}"
+        # Har bir mahsulot uchun o'chirish tugmasi
+        keyboard = InlineKeyboardMarkup(inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text=get_text('decrease_quantity', lang),
+                    callback_data=f"cart_decrease_{item['cart_id']}"
+                ),
+                InlineKeyboardButton(
+                    text=f"🔢 {item['quantity']}",
+                    callback_data=f"cart_quantity_{item['cart_id']}"
+                ),
+                InlineKeyboardButton(
+                    text=get_text('increase_quantity', lang),
+                    callback_data=f"cart_increase_{item['cart_id']}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=get_text('remove_from_cart', lang),
+                    callback_data=f"remove_cart_{item['cart_id']}"
+                )
+            ]
+        ])
+
+        await message.answer(item_text, reply_markup=keyboard)
+
+    # Umumiy ma'lumot va harakatlar
+    total = sum(item['price'] * item['quantity'] for item in cart_items)
+
+    summary_text = f"\n{'=' * 30}\n"
+    summary_text += f"📊 {get_text('cart_summary', lang)}\n\n"
+    summary_text += f"📦 {get_text('total_items', lang)}: {len(cart_items)} ta\n"
+    summary_text += f"💵 {get_text('total', lang)}: {total:,.0f} {get_text('sum', lang)}"
 
     await message.answer(
-        cart_text,
+        summary_text,
         reply_markup=get_cart_keyboard(lang)
     )
+
+
+@cart_router.callback_query(F.data.startswith("cart_increase_"))
+async def increase_cart_quantity(callback: CallbackQuery):
+    """
+    Savat mahsuloti miqdorini oshirish
+    """
+    cart_item_id = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+
+    user = await get_user(user_id)
+    lang = user.get('language', 'uz')
+
+    from database.db import update_cart_quantity
+    result = await update_cart_quantity(cart_item_id, user_id, 1)  # +1
+
+    if result:
+        # Yangilangan ma'lumotni ko'rsatish
+        from database.db import get_cart_item_by_id
+        item = await get_cart_item_by_id(cart_item_id, user_id, lang)
+
+        if item:
+            item_text = f"📦 {item['name']}\n\n"
+            item_text += f"💰 Narxi: {item['price']:,.0f} {get_text('sum', lang)}\n"
+            item_text += f"🔢 Miqdor: {item['quantity']} ta\n"
+            item_text += f"💵 Jami: {item['price'] * item['quantity']:,.0f} {get_text('sum', lang)}"
+
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=get_text('decrease_quantity', lang),
+                        callback_data=f"cart_decrease_{item['cart_id']}"
+                    ),
+                    InlineKeyboardButton(
+                        text=f"🔢 {item['quantity']}",
+                        callback_data=f"cart_quantity_{item['cart_id']}"
+                    ),
+                    InlineKeyboardButton(
+                        text=get_text('increase_quantity', lang),
+                        callback_data=f"cart_increase_{item['cart_id']}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=get_text('remove_from_cart', lang),
+                        callback_data=f"remove_cart_{item['cart_id']}"
+                    )
+                ]
+            ])
+
+            await callback.message.edit_text(item_text, reply_markup=keyboard)
+
+        await callback.answer(get_text('quantity_increased', lang))
+    else:
+        await callback.answer(get_text('cart_error', lang), show_alert=True)
+
+
+@cart_router.callback_query(F.data.startswith("cart_decrease_"))
+async def decrease_cart_quantity(callback: CallbackQuery):
+    """
+    Savat mahsuloti miqdorini kamaytirish
+    """
+    cart_item_id = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+
+    user = await get_user(user_id)
+    lang = user.get('language', 'uz')
+
+    from database.db import update_cart_quantity, get_cart_item_by_id
+
+    # Avval joriy miqdorni tekshirish
+    item = await get_cart_item_by_id(cart_item_id, user_id, lang)
+
+    if not item:
+        await callback.answer(get_text('cart_error', lang), show_alert=True)
+        return
+
+    # Agar miqdor 1 ta bo'lsa, o'chirish
+    if item['quantity'] <= 1:
+        result = await remove_from_cart(cart_item_id, user_id)
+        if result:
+            await callback.message.delete()
+            await callback.answer(get_text('removed_from_cart', lang))
+        else:
+            await callback.answer(get_text('cart_error', lang), show_alert=True)
+        return
+
+    # Miqdorni kamaytirish
+    result = await update_cart_quantity(cart_item_id, user_id, -1)  # -1
+
+    if result:
+        # Yangilangan ma'lumotni ko'rsatish
+        item = await get_cart_item_by_id(cart_item_id, user_id, lang)
+
+        if item:
+            item_text = f"📦 {item['name']}\n\n"
+            item_text += f"💰 Narxi: {item['price']:,.0f} {get_text('sum', lang)}\n"
+            item_text += f"🔢 Miqdor: {item['quantity']} ta\n"
+            item_text += f"💵 Jami: {item['price'] * item['quantity']:,.0f} {get_text('sum', lang)}"
+
+            from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+            keyboard = InlineKeyboardMarkup(inline_keyboard=[
+                [
+                    InlineKeyboardButton(
+                        text=get_text('decrease_quantity', lang),
+                        callback_data=f"cart_decrease_{item['cart_id']}"
+                    ),
+                    InlineKeyboardButton(
+                        text=f"🔢 {item['quantity']}",
+                        callback_data=f"cart_quantity_{item['cart_id']}"
+                    ),
+                    InlineKeyboardButton(
+                        text=get_text('increase_quantity', lang),
+                        callback_data=f"cart_increase_{item['cart_id']}"
+                    )
+                ],
+                [
+                    InlineKeyboardButton(
+                        text=get_text('remove_from_cart', lang),
+                        callback_data=f"remove_cart_{item['cart_id']}"
+                    )
+                ]
+            ])
+
+            await callback.message.edit_text(item_text, reply_markup=keyboard)
+
+        await callback.answer(get_text('quantity_decreased', lang))
+    else:
+        await callback.answer(get_text('cart_error', lang), show_alert=True)
 
 
 @cart_router.callback_query(F.data.startswith("remove_cart_"))
@@ -145,6 +305,11 @@ async def start_checkout(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(
         get_text('send_phone', lang),
         reply_markup=None
+    )
+
+    await callback.message.answer(
+        get_text('phone_request', lang),
+        reply_markup=get_phone_request_keyboard(lang)
     )
 
     await state.set_state(OrderStates.waiting_for_phone)
@@ -255,13 +420,15 @@ async def process_payment(callback: CallbackQuery, state: FSMContext):
             ]
         ])
 
+        # Adminga yuborish
         admins = await get_admins()
         for admin_id in admins:
             try:
                 await callback.bot.send_message(admin_id, admin_text)
-            except:
-                pass
+            except Exception as e:
+                print(f"❌ Admin ga yuborishda xatolik: {e}")
 
+        # Operatorlar guruhiga yuborish
         from config import OPERATORS_GROUP_ID
         if OPERATORS_GROUP_ID:
             try:

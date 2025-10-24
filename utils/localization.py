@@ -68,8 +68,16 @@ TEXTS = {
         'ru': "🛒 Ваша корзина:"
     },
     'cart_empty': {
-        'uz': "😔 Savatingiz bo'sh",
-        'ru': "😔 Ваша корзина пуста"
+        'uz': "😔 Savatingiz bo'sh\n\nMahsulot qo'shish uchun kategoriyalardan birini tanlang.",
+        'ru': "😔 Ваша корзина пуста\n\nВыберите категорию, чтобы добавить товары."
+    },
+    'cart_summary': {
+        'uz': "Savat xulosasi",
+        'ru': "Итого в корзине"
+    },
+    'total_items': {
+        'uz': "Jami mahsulotlar",
+        'ru': "Всего товаров"
     },
     'added_to_cart': {
         'uz': "✅ Mahsulot savatga qo'shildi!",
@@ -79,6 +87,10 @@ TEXTS = {
         'uz': "🗑 Mahsulot savatdan o'chirildi",
         'ru': "🗑 Товар удален из корзины"
     },
+    'remove_from_cart': {
+        'uz': "🗑 Savatdan o'chirish",
+        'ru': "🗑 Удалить из корзины"
+    },
     'cart_cleared': {
         'uz': "🗑 Savat tozalandi",
         'ru': "🗑 Корзина очищена"
@@ -86,6 +98,22 @@ TEXTS = {
     'cart_error': {
         'uz': "❌ Xatolik yuz berdi",
         'ru': "❌ Произошла ошибка"
+    },
+    'increase_quantity': {
+        'uz': "➕",
+        'ru': "➕"
+    },
+    'decrease_quantity': {
+        'uz': "➖",
+        'ru': "➖"
+    },
+    'quantity_increased': {
+        'uz': "✅ Miqdor oshirildi",
+        'ru': "✅ Количество увеличено"
+    },
+    'quantity_decreased': {
+        'uz': "✅ Miqdor kamaytirildi",
+        'ru': "✅ Количество уменьшено"
     },
     'total': {
         'uz': "Jami",
@@ -101,7 +129,10 @@ TEXTS = {
         'uz': "📞 Telefon raqamingizni yuboring",
         'ru': "📞 Отправьте ваш номер телефона"
     },
-
+    'phone_request': {
+        'uz': "👇 Telefon raqamingizni yuboring:",
+        'ru': "👇 Отправьте ваш номер телефона:"
+    },
     'send_contact': {
         'uz': "📱 Telefon raqamni yuborish",
         'ru': "📱 Отправить номер телефона"

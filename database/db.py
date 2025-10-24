@@ -327,6 +327,63 @@ async def get_cart_items(user_id: int, lang: str) -> List[Dict]:
         Session.remove()
 
 
+async def get_cart_item_by_id(cart_item_id: int, user_id: int, lang: str) -> Optional[Dict]:
+    """
+    ID bo'yicha savat mahsulotini olish
+    """
+    try:
+        session = Session()
+        cart_item = session.query(Cart, Product).join(Product).filter(
+            and_(Cart.id == cart_item_id, Cart.user_id == user_id)
+        ).first()
+
+        if cart_item:
+            cart, product = cart_item
+            return {
+                'cart_id': cart.id,
+                'product_id': product.id,
+                'name': product.name_uz if lang == 'uz' else product.name_ru,
+                'price': product.price,
+                'quantity': cart.quantity,
+                'image_url': product.image_url
+            }
+        return None
+    except SQLAlchemyError as e:
+        print(f"❌ Error getting cart item: {e}")
+        return None
+    finally:
+        Session.remove()
+
+
+async def update_cart_quantity(cart_item_id: int, user_id: int, change: int) -> bool:
+    """
+    Savat mahsuloti miqdorini o'zgartirish
+    change: +1 (oshirish) yoki -1 (kamaytirish)
+    """
+    try:
+        session = Session()
+        cart_item = session.query(Cart).filter(
+            and_(Cart.id == cart_item_id, Cart.user_id == user_id)
+        ).first()
+
+        if cart_item:
+            cart_item.quantity += change
+
+            # Agar miqdor 0 ga teng yoki kichik bo'lsa, o'chirish
+            if cart_item.quantity <= 0:
+                session.delete(cart_item)
+
+            session.commit()
+            return True
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"❌ Error updating cart quantity: {e}")
+        return False
+    finally:
+        Session.remove()
+
+
 async def remove_from_cart(cart_item_id: int, user_id: int) -> bool:
     """
     Savatdan mahsulotni o'chirish

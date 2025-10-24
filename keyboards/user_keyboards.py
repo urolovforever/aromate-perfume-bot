@@ -129,7 +129,7 @@ def get_back_to_category_keyboard(category: str, page: int, lang: str) -> Inline
 
 def get_cart_keyboard(lang: str) -> InlineKeyboardMarkup:
     """
-    Savat klaviaturasi
+    Savat klaviaturasi (umumiy amallar)
     """
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
