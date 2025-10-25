@@ -38,26 +38,12 @@ async def show_product_detail(callback: CallbackQuery):
         await callback.answer(get_text('product_not_found', lang), show_alert=True)
         return
 
-    # Ombor miqdorini tekshirish
-    from database.db import get_product_stock, check_product_availability
-    stock = await get_product_stock(product_id)
-    is_available = await check_product_availability(product_id, 1)
-
     # Mahsulot ma'lumotlarini tayyorlash
     product_text = get_text('product_detail', lang).format(
         name=product['name'],
         description=product['description'],
         price=f"{product['price']:,.0f}"
     )
-
-    # Stock ma'lumotini qo'shish
-    if stock is not None:
-        if stock > 10:
-            product_text += f"\n\n✅ {get_text('in_stock', lang)}"
-        elif stock > 0:
-            product_text += f"\n\n⚠️ {get_text('limited_stock', lang)}: {stock} ta"
-        else:
-            product_text += f"\n\n🚫 {get_text('out_of_stock', lang)}"
 
     # Caption uzunligini tekshirish (Telegram max 1024)
     max_caption_length = 1000
@@ -69,13 +55,6 @@ async def show_product_detail(callback: CallbackQuery):
             description=short_description,
             price=f"{product['price']:,.0f}"
         )
-        if stock is not None:
-            if stock > 10:
-                product_text += f"\n\n✅ {get_text('in_stock', lang)}"
-            elif stock > 0:
-                product_text += f"\n\n⚠️ {get_text('limited_stock', lang)}: {stock} ta"
-            else:
-                product_text += f"\n\n🚫 {get_text('out_of_stock', lang)}"
 
     # Rasm bilan birga yuborish
     try:
@@ -83,13 +62,13 @@ async def show_product_detail(callback: CallbackQuery):
         await callback.message.answer_photo(
             photo=product['image_url'],
             caption=product_text,
-            reply_markup=get_product_detail_keyboard(product_id, category, page, lang, is_available)
+            reply_markup=get_product_detail_keyboard(product_id, category, page, lang)
         )
     except Exception as e:
         # Agar rasm yuborishda xatolik bo'lsa, faqat matnni yuboramiz
         await callback.message.edit_text(
             product_text,
-            reply_markup=get_product_detail_keyboard(product_id, category, page, lang, is_available)
+            reply_markup=get_product_detail_keyboard(product_id, category, page, lang)
         )
 
     await callback.answer()
