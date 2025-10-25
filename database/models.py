@@ -48,15 +48,43 @@ class Product(Base):
     price = Column(Float, nullable=False)
     category = Column(String(50), nullable=False)  # men, women, unisex
     image_url = Column(String(500), nullable=False)  # Telegram file_id
+    stock_quantity = Column(Integer, default=0)  # Ombordagi miqdor
+    low_stock_threshold = Column(Integer, default=5)  # Kam qolganda ogohlantirish
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
     cart_items = relationship("Cart", back_populates="product", cascade="all, delete-orphan")
     order_items = relationship("OrderItem", back_populates="product")
+    inventory_logs = relationship("InventoryLog", back_populates="product", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Product(id={self.id}, name_uz='{self.name_uz}', price={self.price})>"
+        return f"<Product(id={self.id}, name_uz='{self.name_uz}', stock={self.stock_quantity})>"
+
+
+class InventoryLog(Base):
+    """
+    Ombor o'zgarishlari loglari
+    """
+    __tablename__ = 'inventory_logs'
+
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.id'), nullable=False)
+    admin_id = Column(Integer, nullable=False)  # Kim o'zgartirdi
+    admin_username = Column(String(255), nullable=True)
+    change_type = Column(String(20), nullable=False)  # manual_add, manual_remove, order_sold, order_cancelled
+    quantity_before = Column(Integer, nullable=False)
+    quantity_after = Column(Integer, nullable=False)
+    change_amount = Column(Integer, nullable=False)  # +10 yoki -5
+    reason = Column(Text, nullable=True)  # Sabab
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    product = relationship("Product", back_populates="inventory_logs")
+
+    def __repr__(self):
+        return f"<InventoryLog(product_id={self.product_id}, change={self.change_amount})>"
 
 
 class Cart(Base):

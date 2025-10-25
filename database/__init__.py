@@ -4,7 +4,7 @@ Database modulini import qilish
 """
 
 from .db import init_db
-from .models import User, Product, Cart, Order, OrderItem
+from .models import User, Product, Cart, Order, OrderItem, InventoryLog
 
 __all__ = [
     'init_db',
@@ -12,5 +12,6 @@ __all__ = [
     'Product',
     'Cart',
     'Order',
-    'OrderItem'
+    'OrderItem',
+    'InventoryLog'
 ]
