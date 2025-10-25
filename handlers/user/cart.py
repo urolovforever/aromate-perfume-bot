@@ -14,11 +14,13 @@ from database.db import (
 )
 from keyboards.user_keyboards import (
     get_cart_keyboard,
+    get_checkout_keyboard,
     get_payment_keyboard,
     get_phone_request_keyboard,
     get_back_to_main_menu_keyboard
 )
 from utils.localization import get_text
+from config import BOT
 
 cart_router = Router()
 
@@ -231,7 +233,6 @@ async def decrease_cart_quantity(callback: CallbackQuery):
 async def remove_from_cart_handler(callback: CallbackQuery):
     """
     Mahsulotni savatdan o'chirish
-    Format: remove_cart_<cart_item_id>
     """
     cart_item_id = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
@@ -242,34 +243,13 @@ async def remove_from_cart_handler(callback: CallbackQuery):
     result = await remove_from_cart(cart_item_id, user_id)
 
     if result:
+        # Xabarni o'chirish
+        try:
+            await callback.message.delete()
+        except:
+            pass
+
         await callback.answer(get_text('removed_from_cart', lang))
-
-        # Savatni yangilangan holda ko'rsatish
-        cart_items = await get_cart_items(user_id, lang)
-
-        if not cart_items:
-            await callback.message.edit_text(
-                get_text('cart_empty', lang),
-                reply_markup=None
-            )
-            return
-
-        # Yangilangan savatni ko'rsatish
-        cart_text = get_text('cart_title', lang) + "\n\n"
-        total = 0
-
-        for idx, item in enumerate(cart_items, 1):
-            cart_text += f"{idx}. {item['name']}\n"
-            cart_text += f"   💰 {item['price']:,.0f} {get_text('sum', lang)} x {item['quantity']}\n"
-            cart_text += f"   = {item['price'] * item['quantity']:,.0f} {get_text('sum', lang)}\n\n"
-            total += item['price'] * item['quantity']
-
-        cart_text += f"\n💵 {get_text('total', lang)}: {total:,.0f} {get_text('sum', lang)}"
-
-        await callback.message.edit_text(
-            cart_text,
-            reply_markup=get_cart_keyboard(lang)
-        )
     else:
         await callback.answer(get_text('cart_error', lang), show_alert=True)
 
@@ -372,6 +352,23 @@ async def process_payment(callback: CallbackQuery, state: FSMContext):
 
     # Savat mahsulotlarini olish
     cart_items = await get_cart_items(user_id, lang)
+
+    if not cart_items:
+        await callback.answer(get_text('cart_empty', lang), show_alert=True)
+        await state.clear()
+        return
+
+    # Stock tekshirish - barcha mahsulotlar uchun
+    from database.db import check_product_availability
+    for item in cart_items:
+        is_available = await check_product_availability(item['product_id'], item['quantity'])
+        if not is_available:
+            await callback.answer(
+                f"❌ {item['name']} - {get_text('insufficient_stock', lang)}",
+                show_alert=True
+            )
+            return
+
     total = sum(item['price'] * item['quantity'] for item in cart_items)
 
     # Buyurtma yaratish
@@ -385,6 +382,18 @@ async def process_payment(callback: CallbackQuery, state: FSMContext):
     )
 
     if order:
+        # MUHIM: Stockni kamaytirish
+        from database.db import update_product_stock
+        for item in cart_items:
+            await update_product_stock(
+                product_id=item['product_id'],
+                change_amount=-item['quantity'],
+                admin_id=user_id,
+                admin_username=callback.from_user.full_name,
+                change_type="order_sold",
+                reason=f"Buyurtma #{order['id']} - Sotildi"
+            )
+
         # Foydalanuvchiga xabar
         order_text = get_text('order_created', lang).format(
             order_id=order['id'],
@@ -424,15 +433,15 @@ async def process_payment(callback: CallbackQuery, state: FSMContext):
         admins = await get_admins()
         for admin_id in admins:
             try:
-                await callback.bot.send_message(admin_id, admin_text)
-            except Exception as e:
-                print(f"❌ Admin ga yuborishda xatolik: {e}")
+                await BOT.send_message(admin_id, admin_text)
+            except:
+                pass
 
         # Operatorlar guruhiga yuborish
         from config import OPERATORS_GROUP_ID
         if OPERATORS_GROUP_ID:
             try:
-                await callback.bot.send_message(
+                await BOT.send_message(
                     OPERATORS_GROUP_ID,
                     admin_text,
                     reply_markup=operator_keyboard
@@ -441,7 +450,6 @@ async def process_payment(callback: CallbackQuery, state: FSMContext):
                 print(f"❌ Operatorlar guruhiga yuborishda xatolik: {e}")
 
         await state.clear()
-
     else:
         await callback.answer(get_text('order_error', lang), show_alert=True)
 
