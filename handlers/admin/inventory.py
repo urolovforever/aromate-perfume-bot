@@ -14,7 +14,6 @@ from database.db import (
     add_ml_variant, get_ml_variants, delete_ml_variant,
     get_product_by_id
 )
-from keyboards.admin_keyboards import get_admin_panel_keyboard
 from utils.localization import get_text
 from utils.decorators import admin_only
 
