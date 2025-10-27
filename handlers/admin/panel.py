@@ -315,13 +315,28 @@ async def update_status_handler(callback: CallbackQuery):
     user = await get_user(callback.from_user.id)
     lang = user.get('language', 'uz')
 
+    # Buyurtmani olish (ombor kamaytirish uchun kerak)
+    from database.db import get_order_by_id, reduce_product_stock
+    order = await get_order_by_id(order_id)
+
     result = await update_order_status(order_id, new_status)
 
     if result:
+        # Agar buyurtma yakunlangan bo'lsa, ombor miqdorini kamaytirish
+        if new_status == 'completed' and order:
+            for item in order['items']:
+                # Faqat bottle (asosiy mahsulot) uchun ombor miqdorini kamaytirish
+                variant_type = item.get('variant_type', 'bottle')
+                if variant_type == 'bottle':
+                    await reduce_product_stock(item['product_id'], item['quantity'])
+
+            # Kam qolgan mahsulotlarni tekshirish va adminlarga xabar berish
+            from handlers.admin.inventory import check_and_notify_low_stock
+            await check_and_notify_low_stock(callback.bot, lang)
+
         await callback.answer(get_text('status_updated', lang), show_alert=True)
 
         # Yangilangan buyurtmani ko'rsatish
-        from database.db import get_order_by_id
         order = await get_order_by_id(order_id)
 
         status_text = {

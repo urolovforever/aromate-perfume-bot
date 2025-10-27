@@ -39,11 +39,24 @@ async def show_product_detail(callback: CallbackQuery):
         return
 
     # Mahsulot ma'lumotlarini tayyorlash
+    stock_text = ""
+    stock_quantity = product.get('stock_quantity', 0)
+
+    if stock_quantity > 0:
+        stock_text = f"\n\n📦 {get_text('in_stock', lang)}: {stock_quantity} {get_text('pieces', lang)}"
+    elif stock_quantity == 0 and not product.get('ml_variants'):
+        stock_text = f"\n\n⛔️ {get_text('out_of_stock', lang)}"
+
     product_text = get_text('product_detail', lang).format(
         name=product['name'],
         description=product['description'],
         price=f"{product['price']:,.0f}"
-    )
+    ) + stock_text
+
+    # ML variantlar mavjud bo'lsa, ma'lumot qo'shamiz
+    if product.get('ml_variants'):
+        ml_info = "\n\n💧 " + get_text('ml_variants_available', lang)
+        product_text += ml_info
 
     # Caption uzunligini tekshirish (Telegram max 1024)
     max_caption_length = 1000
@@ -54,7 +67,9 @@ async def show_product_detail(callback: CallbackQuery):
             name=product['name'],
             description=short_description,
             price=f"{product['price']:,.0f}"
-        )
+        ) + stock_text
+        if product.get('ml_variants'):
+            product_text += ml_info
 
     # Rasm bilan birga yuborish
     try:
@@ -62,13 +77,21 @@ async def show_product_detail(callback: CallbackQuery):
         await callback.message.answer_photo(
             photo=product['image_url'],
             caption=product_text,
-            reply_markup=get_product_detail_keyboard(product_id, category, page, lang)
+            reply_markup=get_product_detail_keyboard(
+                product_id, category, page, lang,
+                product.get('ml_variants', []),
+                stock_quantity
+            )
         )
     except Exception as e:
         # Agar rasm yuborishda xatolik bo'lsa, faqat matnni yuboramiz
         await callback.message.edit_text(
             product_text,
-            reply_markup=get_product_detail_keyboard(product_id, category, page, lang)
+            reply_markup=get_product_detail_keyboard(
+                product_id, category, page, lang,
+                product.get('ml_variants', []),
+                stock_quantity
+            )
         )
 
     await callback.answer()
@@ -77,14 +100,32 @@ async def show_product_detail(callback: CallbackQuery):
 @product_router.callback_query(F.data.startswith("add_cart_"))
 async def add_product_to_cart(callback: CallbackQuery):
     """
-    Mahsulotni savatga qo'shish
-    Format: add_cart_<product_id>
+    Mahsulotni savatga qo'shish (bottle yoki ml variant)
+    Format: add_cart_<product_id>_bottle
+    Format: add_cart_<product_id>_ml_<variant_id>
     """
-    product_id = int(callback.data.split("_")[2])
+    from database.db import get_product_by_id, reduce_product_stock
+
+    data = callback.data.split("_")
+    product_id = int(data[2])
     user_id = callback.from_user.id
 
     user = await get_user(user_id)
     lang = user.get('language', 'uz')
+
+    # Variant turini aniqlash
+    variant_type = data[3] if len(data) > 3 else "bottle"
+    ml_variant_id = int(data[4]) if len(data) > 4 and variant_type == "ml" else None
+
+    # Agar bottle bo'lsa, ombordagi miqdorni tekshirish
+    if variant_type == "bottle":
+        product = await get_product_by_id(product_id, lang)
+        if not product or product.get('stock_quantity', 0) <= 0:
+            await callback.answer(
+                get_text('out_of_stock', lang),
+                show_alert=True
+            )
+            return
 
     # Savatga qo'shish
     result = await add_to_cart(user_id, product_id, quantity=1)

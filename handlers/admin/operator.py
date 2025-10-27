@@ -7,7 +7,7 @@ from aiogram import Router, F
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.exceptions import TelegramBadRequest
 
-from database.db import get_order_by_id, assign_operator_to_order, update_order_status
+from database.db import get_order_by_id, assign_operator_to_order, update_order_status, reduce_product_stock
 from utils.localization import get_text
 from utils.decorators import can_modify_order
 
@@ -121,6 +121,19 @@ async def operator_change_status(callback: CallbackQuery):
     result = await update_order_status(order_id, new_status)
 
     if result:
+        # Agar buyurtma yakunlangan bo'lsa, ombor miqdorini kamaytirish
+        if new_status == 'completed':
+            for item in order['items']:
+                # Faqat bottle (asosiy mahsulot) uchun ombor miqdorini kamaytirish
+                # ML variantlar uchun ombor kuzatilmaydi
+                variant_type = item.get('variant_type', 'bottle')
+                if variant_type == 'bottle':
+                    await reduce_product_stock(item['product_id'], item['quantity'])
+
+            # Kam qolgan mahsulotlarni tekshirish va adminlarga xabar berish
+            from handlers.admin.inventory import check_and_notify_low_stock
+            await check_and_notify_low_stock(callback.bot, 'uz')
+
         status_emoji = {
             'new': '🆕',
             'processing': '⏳',

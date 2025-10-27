@@ -97,20 +97,47 @@ def get_products_list_keyboard(products: List[Dict], category: str,
 
 
 def get_product_detail_keyboard(product_id: int, category: str,
-                                page: int, lang: str) -> InlineKeyboardMarkup:
+                                page: int, lang: str,
+                                ml_variants: List[Dict] = None,
+                                stock_quantity: int = 0) -> InlineKeyboardMarkup:
     """
-    Mahsulot tafsilotlari klaviaturasi
+    Mahsulot tafsilotlari klaviaturasi (ML variantlar bilan)
     """
-    keyboard = InlineKeyboardMarkup(inline_keyboard=[
-        [
+    buttons = []
+
+    # Agar omborda mahsulot bo'lsa, asosiy mahsulotni qo'shish tugmasini ko'rsatish
+    if stock_quantity > 0:
+        buttons.append([
             InlineKeyboardButton(text=get_text('add_to_cart', lang),
-                                 callback_data=f"add_cart_{product_id}")
-        ],
-        [
-            InlineKeyboardButton(text=get_text('back', lang),
-                                 callback_data=f"back_category_{category}_{page}")
-        ]
+                                 callback_data=f"add_cart_{product_id}_bottle")
+        ])
+
+    # ML variantlar tugmalari
+    if ml_variants:
+        ml_text = "ML" if lang == 'uz' else "МЛ"
+        for variant in ml_variants:
+            button_text = f"{variant['ml_amount']} {ml_text} - {variant['price']:,.0f} {get_text('sum', lang)}"
+            buttons.append([
+                InlineKeyboardButton(
+                    text=button_text,
+                    callback_data=f"add_cart_{product_id}_ml_{variant['id']}"
+                )
+            ])
+
+    # Agar omborda mahsulot yo'q va ML variantlar ham yo'q bo'lsa
+    if stock_quantity == 0 and not ml_variants:
+        out_of_stock_text = "⛔️ Tugagan" if lang == 'uz' else "⛔️ Закончился"
+        buttons.append([
+            InlineKeyboardButton(text=out_of_stock_text, callback_data="out_of_stock")
+        ])
+
+    # Orqaga qaytish tugmasi
+    buttons.append([
+        InlineKeyboardButton(text=get_text('back', lang),
+                             callback_data=f"back_category_{category}_{page}")
     ])
+
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
     return keyboard
 
 
