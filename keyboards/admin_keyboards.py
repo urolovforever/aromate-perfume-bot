@@ -22,6 +22,10 @@ def get_admin_menu_keyboard(lang: str) -> InlineKeyboardMarkup:
                                  callback_data="admin_products_list")
         ],
         [
+            InlineKeyboardButton(text=get_text('manage_inventory', lang),
+                                 callback_data="manage_inventory")
+        ],
+        [
             InlineKeyboardButton(text=get_text('admin_orders_list', lang),
                                  callback_data="admin_orders_list")
         ],

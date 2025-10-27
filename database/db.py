@@ -9,7 +9,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional, List, Dict
 from datetime import datetime
 
-from .models import Base, User, Product, Cart, Order, OrderItem
+from .models import Base, User, Product, Cart, Order, OrderItem, ProductMLVariant
 from config import DATABASE_URL
 
 # Engine va session yaratish
@@ -141,7 +141,8 @@ async def get_products_by_category(category: str, lang: str) -> List[Dict]:
                 'description': product.description_uz if lang == 'uz' else product.description_ru,
                 'price': product.price,
                 'category': product.category,
-                'image_url': product.image_url
+                'image_url': product.image_url,
+                'stock_quantity': product.stock_quantity
             })
 
         return result
@@ -161,13 +162,31 @@ async def get_product_by_id(product_id: int, lang: str) -> Optional[Dict]:
         product = session.query(Product).filter(Product.id == product_id).first()
 
         if product:
+            # ML variantlarni olish
+            ml_variants = session.query(ProductMLVariant).filter(
+                and_(
+                    ProductMLVariant.product_id == product_id,
+                    ProductMLVariant.is_active == True
+                )
+            ).order_by(ProductMLVariant.ml_amount).all()
+
+            variants_list = []
+            for variant in ml_variants:
+                variants_list.append({
+                    'id': variant.id,
+                    'ml_amount': variant.ml_amount,
+                    'price': variant.price
+                })
+
             return {
                 'id': product.id,
                 'name': product.name_uz if lang == 'uz' else product.name_ru,
                 'description': product.description_uz if lang == 'uz' else product.description_ru,
                 'price': product.price,
                 'category': product.category,
-                'image_url': product.image_url
+                'image_url': product.image_url,
+                'stock_quantity': product.stock_quantity,
+                'ml_variants': variants_list
             }
         return None
     except SQLAlchemyError as e:
@@ -193,7 +212,9 @@ async def get_all_products() -> List[Dict]:
                 'name_ru': product.name_ru,
                 'price': product.price,
                 'category': product.category,
-                'image_url': product.image_url
+                'image_url': product.image_url,
+                'stock_quantity': product.stock_quantity,
+                'low_stock_threshold': product.low_stock_threshold
             })
 
         return result
@@ -206,7 +227,8 @@ async def get_all_products() -> List[Dict]:
 
 async def create_product(name_uz: str, name_ru: str, description_uz: str,
                          description_ru: str, price: float, category: str,
-                         image_url: str) -> Optional[Dict]:
+                         image_url: str, stock_quantity: int = 0,
+                         low_stock_threshold: int = 5) -> Optional[Dict]:
     """
     Yangi mahsulot yaratish
     """
@@ -220,7 +242,9 @@ async def create_product(name_uz: str, name_ru: str, description_uz: str,
             description_ru=description_ru,
             price=price,
             category=category,
-            image_url=image_url
+            image_url=image_url,
+            stock_quantity=stock_quantity,
+            low_stock_threshold=low_stock_threshold
         )
 
         session.add(new_product)
@@ -231,7 +255,8 @@ async def create_product(name_uz: str, name_ru: str, description_uz: str,
             'id': new_product.id,
             'name_uz': new_product.name_uz,
             'name_ru': new_product.name_ru,
-            'price': new_product.price
+            'price': new_product.price,
+            'stock_quantity': new_product.stock_quantity
         }
     except SQLAlchemyError as e:
         session.rollback()
@@ -257,6 +282,210 @@ async def delete_product(product_id: int) -> bool:
     except SQLAlchemyError as e:
         session.rollback()
         print(f"❌ Error deleting product: {e}")
+        return False
+    finally:
+        Session.remove()
+
+
+# ==================== INVENTORY MANAGEMENT FUNCTIONS ====================
+
+async def update_product_stock(product_id: int, new_stock: int) -> bool:
+    """
+    Mahsulot miqdorini yangilash (admin tomonidan qo'lda)
+    """
+    try:
+        session = Session()
+        product = session.query(Product).filter(Product.id == product_id).first()
+
+        if product:
+            product.stock_quantity = new_stock
+            session.commit()
+            return True
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"❌ Error updating stock: {e}")
+        return False
+    finally:
+        Session.remove()
+
+
+async def reduce_product_stock(product_id: int, quantity: int) -> bool:
+    """
+    Mahsulot miqdorini kamaytirish (buyurtma berilganda)
+    """
+    try:
+        session = Session()
+        product = session.query(Product).filter(Product.id == product_id).first()
+
+        if product and product.stock_quantity >= quantity:
+            product.stock_quantity -= quantity
+            session.commit()
+            return True
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"❌ Error reducing stock: {e}")
+        return False
+    finally:
+        Session.remove()
+
+
+async def get_low_stock_products(lang: str = 'uz') -> List[Dict]:
+    """
+    Kam qolgan mahsulotlarni olish
+    """
+    try:
+        session = Session()
+        products = session.query(Product).filter(
+            and_(
+                Product.is_active == True,
+                Product.stock_quantity <= Product.low_stock_threshold,
+                Product.stock_quantity > 0
+            )
+        ).all()
+
+        result = []
+        for product in products:
+            result.append({
+                'id': product.id,
+                'name': product.name_uz if lang == 'uz' else product.name_ru,
+                'stock_quantity': product.stock_quantity,
+                'low_stock_threshold': product.low_stock_threshold
+            })
+
+        return result
+    except SQLAlchemyError as e:
+        print(f"❌ Error getting low stock products: {e}")
+        return []
+    finally:
+        Session.remove()
+
+
+async def get_out_of_stock_products(lang: str = 'uz') -> List[Dict]:
+    """
+    Tugagan mahsulotlarni olish
+    """
+    try:
+        session = Session()
+        products = session.query(Product).filter(
+            and_(
+                Product.is_active == True,
+                Product.stock_quantity == 0
+            )
+        ).all()
+
+        result = []
+        for product in products:
+            result.append({
+                'id': product.id,
+                'name': product.name_uz if lang == 'uz' else product.name_ru,
+                'stock_quantity': product.stock_quantity
+            })
+
+        return result
+    except SQLAlchemyError as e:
+        print(f"❌ Error getting out of stock products: {e}")
+        return []
+    finally:
+        Session.remove()
+
+
+# ==================== ML VARIANT FUNCTIONS ====================
+
+async def add_ml_variant(product_id: int, ml_amount: int, price: float) -> Optional[Dict]:
+    """
+    Mahsulotga ML variant qo'shish
+    """
+    try:
+        session = Session()
+
+        # Mahsulot mavjudligini tekshirish
+        product = session.query(Product).filter(Product.id == product_id).first()
+        if not product:
+            return None
+
+        # Variant mavjudligini tekshirish
+        existing = session.query(ProductMLVariant).filter(
+            and_(
+                ProductMLVariant.product_id == product_id,
+                ProductMLVariant.ml_amount == ml_amount
+            )
+        ).first()
+
+        if existing:
+            return None  # Allaqachon mavjud
+
+        new_variant = ProductMLVariant(
+            product_id=product_id,
+            ml_amount=ml_amount,
+            price=price
+        )
+
+        session.add(new_variant)
+        session.commit()
+        session.refresh(new_variant)
+
+        return {
+            'id': new_variant.id,
+            'product_id': new_variant.product_id,
+            'ml_amount': new_variant.ml_amount,
+            'price': new_variant.price
+        }
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"❌ Error adding ML variant: {e}")
+        return None
+    finally:
+        Session.remove()
+
+
+async def get_ml_variants(product_id: int) -> List[Dict]:
+    """
+    Mahsulotning ML variantlarini olish
+    """
+    try:
+        session = Session()
+        variants = session.query(ProductMLVariant).filter(
+            and_(
+                ProductMLVariant.product_id == product_id,
+                ProductMLVariant.is_active == True
+            )
+        ).order_by(ProductMLVariant.ml_amount).all()
+
+        result = []
+        for variant in variants:
+            result.append({
+                'id': variant.id,
+                'product_id': variant.product_id,
+                'ml_amount': variant.ml_amount,
+                'price': variant.price
+            })
+
+        return result
+    except SQLAlchemyError as e:
+        print(f"❌ Error getting ML variants: {e}")
+        return []
+    finally:
+        Session.remove()
+
+
+async def delete_ml_variant(variant_id: int) -> bool:
+    """
+    ML variantni o'chirish (soft delete)
+    """
+    try:
+        session = Session()
+        variant = session.query(ProductMLVariant).filter(ProductMLVariant.id == variant_id).first()
+
+        if variant:
+            variant.is_active = False
+            session.commit()
+            return True
+        return False
+    except SQLAlchemyError as e:
+        session.rollback()
+        print(f"❌ Error deleting ML variant: {e}")
         return False
     finally:
         Session.remove()

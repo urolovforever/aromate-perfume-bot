@@ -49,14 +49,20 @@ class Product(Base):
     category = Column(String(50), nullable=False)  # men, women, unisex
     image_url = Column(String(500), nullable=False)  # Telegram file_id
     is_active = Column(Boolean, default=True)
+
+    # Ombor tizimi (Inventory management)
+    stock_quantity = Column(Integer, default=0, nullable=False)  # Ombordagi miqdor
+    low_stock_threshold = Column(Integer, default=5, nullable=False)  # Kam qolganda ogohlantirish
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     # Relationships
     cart_items = relationship("Cart", back_populates="product", cascade="all, delete-orphan")
     order_items = relationship("OrderItem", back_populates="product")
+    ml_variants = relationship("ProductMLVariant", back_populates="product", cascade="all, delete-orphan")
 
     def __repr__(self):
-        return f"<Product(id={self.id}, name_uz='{self.name_uz}', price={self.price})>"
+        return f"<Product(id={self.id}, name_uz='{self.name_uz}', price={self.price}, stock={self.stock_quantity})>"
 
 
 class Cart(Base):
@@ -118,6 +124,8 @@ class OrderItem(Base):
     product_name = Column(String(255), nullable=False)  # Mahsulot nomi o'chirilsa ham saqlansin
     quantity = Column(Integer, nullable=False)
     price = Column(Float, nullable=False)  # Buyurtma paytidagi narx
+    variant_type = Column(String(20), nullable=True)  # 'bottle' yoki 'ml' (variant turi)
+    ml_variant_id = Column(Integer, ForeignKey('product_ml_variants.id'), nullable=True)  # ML variant ID
 
     # Relationships
     order = relationship("Order", back_populates="items")
@@ -125,3 +133,24 @@ class OrderItem(Base):
 
     def __repr__(self):
         return f"<OrderItem(order_id={self.order_id}, product_name='{self.product_name}', quantity={self.quantity})>"
+
+
+class ProductMLVariant(Base):
+    """
+    Mahsulot ML variantlari jadvali (omborsiz)
+    ML larda sotiluvchi atirlar uchun
+    """
+    __tablename__ = 'product_ml_variants'
+
+    id = Column(Integer, primary_key=True)
+    product_id = Column(Integer, ForeignKey('products.id'), nullable=False)
+    ml_amount = Column(Integer, nullable=False)  # ML miqdori (masalan: 5, 10, 15)
+    price = Column(Float, nullable=False)  # ML variant narxi
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    product = relationship("Product", back_populates="ml_variants")
+
+    def __repr__(self):
+        return f"<ProductMLVariant(product_id={self.product_id}, ml={self.ml_amount}, price={self.price})>"

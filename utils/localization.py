@@ -468,6 +468,72 @@ TEXTS = {
     'total_revenue': {
         'uz': "Umumiy daromad",
         'ru': "Общий доход"
+    },
+
+    # Ombor tizimi (Inventory)
+    'in_stock': {
+        'uz': "Omborda",
+        'ru': "В наличии"
+    },
+    'out_of_stock': {
+        'uz': "Tugagan",
+        'ru': "Закончился"
+    },
+    'pieces': {
+        'uz': "dona",
+        'ru': "шт"
+    },
+    'ml_variants_available': {
+        'uz': "ML larda ham sotiladi",
+        'ru': "Также продается в МЛ"
+    },
+    'low_stock_warning': {
+        'uz': "⚠️ Kam qoldi!",
+        'ru': "⚠️ Мало осталось!"
+    },
+    'manage_inventory': {
+        'uz': "📦 Ombor boshqaruvi",
+        'ru': "📦 Управление складом"
+    },
+    'add_ml_variant': {
+        'uz': "💧 ML variant qo'shish",
+        'ru': "💧 Добавить ML вариант"
+    },
+    'update_stock': {
+        'uz': "📝 Miqdorni yangilash",
+        'ru': "📝 Обновить количество"
+    },
+    'enter_new_stock': {
+        'uz': "📦 Yangi miqdorni kiriting:",
+        'ru': "📦 Введите новое количество:"
+    },
+    'stock_updated': {
+        'uz': "✅ Ombor miqdori yangilandi",
+        'ru': "✅ Количество на складе обновлено"
+    },
+    'enter_ml_amount': {
+        'uz': "💧 ML miqdorini kiriting:",
+        'ru': "💧 Введите количество ML:"
+    },
+    'enter_ml_price': {
+        'uz': "💰 ML variant narxini kiriting:",
+        'ru': "💰 Введите цену ML варианта:"
+    },
+    'ml_variant_added': {
+        'uz': "✅ ML variant qo'shildi",
+        'ru': "✅ ML вариант добавлен"
+    },
+    'low_stock_notification': {
+        'uz': "⚠️ OGOHLANTIRISH!\n\nQuyidagi mahsulotlar tugab qolmoqda:\n\n{products}",
+        'ru': "⚠️ ПРЕДУПРЕЖДЕНИЕ!\n\nСледующие товары заканчиваются:\n\n{products}"
+    },
+    'check_low_stock': {
+        'uz': "⚠️ Kam qolgan mahsulotlar",
+        'ru': "⚠️ Товары с низким остатком"
+    },
+    'no_low_stock': {
+        'uz': "✅ Barcha mahsulotlar yetarli miqdorda",
+        'ru': "✅ Все товары в достаточном количестве"
     }
 }
 

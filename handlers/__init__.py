@@ -9,6 +9,7 @@ from .user.product import product_router
 from .user.cart import cart_router
 from .admin.panel import admin_panel_router
 from .admin.add_product import add_product_router
+from .admin.inventory import inventory_router
 from .admin.operator import operator_router
 
 
@@ -26,6 +27,7 @@ def register_all_handlers(dp):
     # Admin handlerlar
     dp.include_router(admin_panel_router)
     dp.include_router(add_product_router)
+    dp.include_router(inventory_router)
 
     # Operator handlerlar
     dp.include_router(operator_router)
