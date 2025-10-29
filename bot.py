@@ -2,6 +2,9 @@
 """
 Botni ishga tushirish asosiy fayli bu yerda
 """
+"""
+master1 branchda o'zgarish
+"""
 
 import asyncio
 import sys
