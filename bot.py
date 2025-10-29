@@ -1,6 +1,6 @@
 # bot.py
 """
-Botni ishga tushirish asosiy fayli
+Botni ishga tushirish asosiy fayli bu yerda
 """
 
 import asyncio
